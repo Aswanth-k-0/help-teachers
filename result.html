@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Analytics & Result Portal</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-md">
+        <div
+            class="max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">Multi-Sheet Performance Analyzer</h1>
+                <p class="text-slate-400 text-xs mt-0.5">Accepts spreadsheet workbooks like <span
+                        class="font-mono text-slate-300">file.xlsx</span></p>
+            </div>
+            <div
+                class="flex flex-col xs:flex-row items-start xs:items-center gap-2 bg-slate-800 p-2 rounded-lg border border-slate-700 w-full md:w-auto">
+                <label
+                    class="block text-xs font-semibold uppercase text-slate-400 pl-1 sm:pl-2 whitespace-nowrap">Upload
+                    Excel:</label>
+                <input type="file" id="excel-file-input" accept=".xlsx, .xls"
+                    class="w-full text-sm text-slate-400 file:mr-2 sm:file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+
+        <!-- STEP 1: SHEET / CLASS SELECTION TABS -->
+        <div class="mb-4">
+            <span class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Available Sheets /
+                Classes</span>
+            <div id="sheets-tab-container" class="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+                <div class="text-slate-400 text-sm italic py-2">Please upload your spreadsheet file to populate class
+                    tabs...</div>
+            </div>
+        </div>
+
+        <!-- TOTAL SUBJECTS INPUT (shown after a class is selected) -->
+        <div id="subject-selector-panel"
+            class="hidden mb-5 bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Total Subjects in Class</label>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="subject-no-input" min="1" placeholder="e.g. 5"
+                            class="w-24 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-center focus:outline-none focus:border-blue-500">
+                        <button onclick="clearSubjectSelection()" id="clear-subject-btn"
+                            class="hidden text-xs text-slate-500 hover:text-red-600 px-2.5 py-2 rounded-lg border border-slate-200 hover:border-red-300 transition-colors">
+                            ✕ Clear
+                        </button>
+                    </div>
+                </div>
+                <div id="subject-status-panel" class="hidden">
+                    <p class="text-xs font-bold uppercase text-slate-500 mb-1">Subject Status</p>
+                    <p id="subject-status-display" class="text-sm font-medium px-3 py-2 rounded-lg border"></p>
+                </div>
+                <p id="subject-avail-note" class="text-xs text-slate-400 italic self-center hidden"></p>
+            </div>
+        </div>
+
+        <!-- STEP 2: VIEW TABS -->
+        <div class="mb-6">
+            <div class="sm:hidden">
+                <select id="view-tabs-select"
+                    class="w-full rounded-md border-slate-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500">
+                    <option value="student-wise" selected>Student-Wise Profiles</option>
+                    <option value="subject-stats">Subject-Wise Analytics</option>
+                </select>
+            </div>
+            <div class="hidden sm:block">
+                <div class="border-b border-slate-200">
+                    <nav class="flex space-x-8" aria-label="Tabs">
+                        <button onclick="switchViewTab('student-wise')" id="tab-student-wise"
+                            class="view-tab border-blue-500 text-blue-600 border-b-2 py-4 px-1 text-sm font-medium tracking-wide cursor-pointer focus:outline-none">
+                            👤 Student-Wise Analysis
+                        </button>
+                        <button onclick="switchViewTab('subject-stats')" id="tab-subject-stats"
+                            class="view-tab border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2 py-4 px-1 text-sm font-medium tracking-wide cursor-pointer focus:outline-none">
+                            📊 Subject Performance Metrics
+                        </button>
+                    </nav>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI SUMMARY CARDS -->
+        <div id="kpi-panel" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div class="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-xs">
+                <p class="text-xs font-semibold text-slate-400 uppercase">Total Students</p>
+                <p id="kpi-total" class="text-xl sm:text-2xl font-bold text-slate-900 mt-1">0</p>
+            </div>
+            <div class="bg-emerald-50 p-3 sm:p-4 rounded-xl border border-emerald-200 shadow-xs">
+                <p id="kpi-pass-label" class="text-xs font-semibold text-emerald-700 uppercase">Full Pass</p>
+                <p id="kpi-pass" class="text-xl sm:text-2xl font-bold text-emerald-800 mt-1">0</p>
+            </div>
+            <div class="bg-amber-50 p-3 sm:p-4 rounded-xl border border-amber-200 shadow-xs">
+                <p id="kpi-fail-label" class="text-xs font-semibold text-amber-700 uppercase">1 Subject Fail</p>
+                <p id="kpi-fail1" class="text-xl sm:text-2xl font-bold text-amber-800 mt-1">0</p>
+            </div>
+            <div class="bg-rose-50 p-3 sm:p-4 rounded-xl border border-rose-200 shadow-xs">
+                <p class="text-xs font-semibold text-rose-700 uppercase">Pass Percentage</p>
+                <p id="kpi-rate" class="text-xl sm:text-2xl font-bold text-rose-800 mt-1">0%</p>
+            </div>
+        </div>
+
+        <!-- VIEW 1: STUDENT WISE -->
+        <div id="content-student-wise" class="view-content block">
+            <!-- Filter Panel -->
+            <div
+                class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs mb-6 flex flex-col sm:flex-row gap-4 items-end">
+                <div class="w-full sm:w-1/3">
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Search Student</label>
+                    <input type="text" id="student-search" placeholder="Enter name or Register No..."
+                        class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="w-full sm:w-1/3">
+                    <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Standing Filter</label>
+                    <select id="student-filter"
+                        class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <option value="ALL">Show All Cohort Results</option>
+                        <option value="PASS">Full Pass</option>
+                        <option value="FAIL1">1 Subject Fail</option>
+                        <option value="FAIL_MULTI">Multiple Subjects Fail (&gt;1)</option>
+                    </select>
+                </div>
+                <div class="w-full sm:w-1/3 flex flex-col items-end gap-1">
+                    <span id="record-count" class="text-xs text-slate-400 font-medium">No records loaded</span>
+                    <!-- Export PDF Dropdown -->
+                    <div class="relative">
+                        <button onclick="toggleExportMenu(event)"
+                            class="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors focus:outline-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h4a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                            </svg>
+                            Export PDF
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24"
+                                stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </button>
+                        <div id="export-menu"
+                            class="hidden absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                            <!-- rebuilt dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="student-grid" class="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6"></div>
+        </div>
+
+        <!-- VIEW 2: SUBJECT STATISTICS -->
+        <div id="content-subject-stats" class="view-content hidden">
+            <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                    <h3 class="text-base font-bold text-slate-900">Subject Performance Analysis Matrix</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">A complete summary of failure counts and clear rates across
+                        distinct curricula components.</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-600">
+                        <thead class="bg-slate-100 text-slate-500 text-xs uppercase font-semibold">
+                            <tr>
+                                <th class="px-3 sm:px-6 py-3">Subject Name / Component Title</th>
+                                <th class="px-3 sm:px-6 py-3 text-center">Evals</th>
+                                <th class="px-3 sm:px-6 py-3 text-center">Passed</th>
+                                <th class="px-3 sm:px-6 py-3 text-center">Failed</th>
+                                <th class="px-3 sm:px-6 py-3 text-center">Pass Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="subject-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Standby view -->
+        <div id="fallback-status"
+            class="bg-white rounded-xl border border-dashed border-slate-300 text-center py-20 mt-4">
+            <p class="text-slate-400 font-medium text-lg">No Active Sheet Selected</p>
+            <p class="text-slate-400 text-xs mt-1">Please select an uploaded Excel worksheet tab at the top to configure
+                evaluation modules.</p>
+        </div>
+
+    </main>
+
+    <script>
+        // ── Global state ────────────────────────────────────────
+        let workbookData = {};
+        let activeSheetName = "";
+        let currentActiveView = "student-wise";
+        let totalSubjectCount = null;     // teacher-entered total subjects for this class
+        let sheetSubjectNames = [];       // ordered unique subject names detected from data
+
+        const ABSENT_MARKERS = new Set(['AB', 'WH', 'NA', 'N/A', '--', '', 'ABSENT', 'DNE', 'DNP']);
+
+        // ── Init listeners ──────────────────────────────────────
+        document.getElementById('excel-file-input').addEventListener('change', handleExcelUpload, false);
+        document.getElementById('student-search').addEventListener('input', applyCurrentFilters);
+        document.getElementById('student-filter').addEventListener('change', applyCurrentFilters);
+        document.getElementById('view-tabs-select').addEventListener('change', e => switchViewTab(e.target.value));
+        document.getElementById('subject-no-input').addEventListener('input', handleTotalSubjectsInput);
+        document.addEventListener('click', () => document.getElementById('export-menu').classList.add('hidden'));
+
+        // ── File upload ─────────────────────────────────────────
+        function handleExcelUpload(e) {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+                const data = new Uint8Array(ev.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                workbookData = {};
+                workbook.SheetNames.forEach(sheetName => {
+                    const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+                    if (rawRows.length > 0) workbookData[sheetName] = processRawRows(rawRows);
+                });
+                generateSheetTabs();
+            };
+            reader.readAsArrayBuffer(files[0]);
+        }
+
+        function processRawRows(rows) {
+            let compiled = {};
+            rows.forEach(row => {
+                if (!row[0] || isNaN(row[0]) || row.length < 6) return;
+                const regNo = String(row[0]).trim();
+                const name = String(row[1]).trim();
+                const branch = String(row[2]).trim();
+                const subject = String(row[4]).trim();
+                const marks = row[8] !== undefined ? String(row[8]).trim() : "0";
+                const grade = row[9] !== undefined ? String(row[9]).trim() : "F";
+                const result = row[10] !== undefined ? String(row[10]).trim() : "F";
+                if (!compiled[regNo]) {
+                    compiled[regNo] = { reg: regNo, name, dept: branch, subjects: [], fail_count: 0, status: "" };
+                }
+                compiled[regNo].subjects.push({ name: subject, marks, grade, result });
+            });
+            Object.values(compiled).forEach(s => {
+                s.fail_count = s.subjects.filter(sub => classifySubject(sub) === 'FAIL').length;
+                if (s.fail_count === 0) s.status = "Full Pass";
+                else if (s.fail_count === 1) s.status = "1 Subject Fail";
+                else s.status = `${s.fail_count} Subjects Fail`;
+            });
+            return Object.values(compiled);
+        }
+
+        // ── Sheet tabs ──────────────────────────────────────────
+        function generateSheetTabs() {
+            const container = document.getElementById('sheets-tab-container');
+            container.innerHTML = '';
+            const names = Object.keys(workbookData);
+            if (!names.length) return;
+            names.forEach((name, i) => {
+                const btn = document.createElement('button');
+                btn.textContent = name;
+                btn.className = "px-4 py-2 text-xs font-semibold uppercase rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer focus:outline-none transition-colors";
+                btn.onclick = () => selectClassSheet(name, btn);
+                container.appendChild(btn);
+                if (i === 0) selectClassSheet(name, btn);
+            });
+        }
+
+        function selectClassSheet(sheetName, buttonElement) {
+            activeSheetName = sheetName;
+
+            // Reset total-subjects input on class change
+            totalSubjectCount = null;
+            document.getElementById('subject-no-input').value = '';
+            document.getElementById('subject-status-panel').classList.add('hidden');
+            document.getElementById('clear-subject-btn').classList.add('hidden');
+
+            // Collect unique subject names in first-appearance order
+            const students = workbookData[sheetName];
+            const seen = new Set();
+            sheetSubjectNames = [];
+            students.forEach(s => s.subjects.forEach(sub => {
+                if (!seen.has(sub.name)) { seen.add(sub.name); sheetSubjectNames.push(sub.name); }
+            }));
+
+            const note = document.getElementById('subject-avail-note');
+            note.textContent = `${sheetSubjectNames.length} subject${sheetSubjectNames.length !== 1 ? 's' : ''} detected — enter total count to validate`;
+            note.classList.remove('hidden');
+            document.getElementById('subject-selector-panel').classList.remove('hidden');
+
+            // Highlight active tab
+            Array.from(document.getElementById('sheets-tab-container').children).forEach(btn => {
+                btn.className = "px-4 py-2 text-xs font-semibold uppercase rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 cursor-pointer focus:outline-none transition-colors";
+            });
+            buttonElement.className = "px-4 py-2 text-xs font-semibold uppercase rounded-lg border-2 border-blue-600 bg-blue-50 text-blue-700 font-bold cursor-pointer focus:outline-none";
+
+            document.getElementById('fallback-status').classList.add('hidden');
+            document.getElementById('kpi-panel').classList.remove('hidden');
+
+            rebuildExportMenu();
+            calculateMetricsAndKPIs(students);
+            applyCurrentFilters();
+        }
+
+        // ── Total subjects input handler ────────────────────────
+        function handleTotalSubjectsInput() {
+            const raw = parseInt(document.getElementById('subject-no-input').value, 10);
+            const detected = sheetSubjectNames.length;
+
+            if (!raw || raw < 1) {
+                totalSubjectCount = null;
+                document.getElementById('subject-status-panel').classList.add('hidden');
+                document.getElementById('clear-subject-btn').classList.add('hidden');
+            } else {
+                totalSubjectCount = raw;
+                document.getElementById('clear-subject-btn').classList.remove('hidden');
+                document.getElementById('subject-status-panel').classList.remove('hidden');
+
+                const display = document.getElementById('subject-status-display');
+                if (raw === detected) {
+                    display.textContent = `✓ Matches — ${detected} subjects detected`;
+                    display.className = "text-sm font-medium px-3 py-2 rounded-lg border text-emerald-700 bg-emerald-50 border-emerald-200";
+                } else if (raw > detected) {
+                    display.textContent = `⚠ ${raw - detected} subject(s) missing in some records`;
+                    display.className = "text-sm font-medium px-3 py-2 rounded-lg border text-amber-700 bg-amber-50 border-amber-200";
+                } else {
+                    display.textContent = `⚠ ${detected} detected, entered ${raw} — check count`;
+                    display.className = "text-sm font-medium px-3 py-2 rounded-lg border text-rose-700 bg-rose-50 border-rose-200";
+                }
+            }
+
+            if (activeSheetName && workbookData[activeSheetName]) {
+                calculateMetricsAndKPIs(workbookData[activeSheetName]);
+                applyCurrentFilters();
+            }
+        }
+
+        function clearSubjectSelection() {
+            totalSubjectCount = null;
+            document.getElementById('subject-no-input').value = '';
+            document.getElementById('subject-status-panel').classList.add('hidden');
+            document.getElementById('clear-subject-btn').classList.add('hidden');
+            if (activeSheetName && workbookData[activeSheetName]) {
+                calculateMetricsAndKPIs(workbookData[activeSheetName]);
+                applyCurrentFilters();
+            }
+        }
+
+        // ── KPI cards ───────────────────────────────────────────
+        function calculateMetricsAndKPIs(students) {
+            const total = students.length;
+            // Full pass: all detected subjects passed (no F, no absent/missing)
+            const fullPass = students.filter(s => {
+                if (totalSubjectCount && s.subjects.length < totalSubjectCount) return false;
+                return s.fail_count === 0 && s.subjects.every(sub => classifySubject(sub) !== 'ABSENT');
+            }).length;
+            const oneFail = students.filter(s => s.fail_count === 1).length;
+            const rate = total > 0 ? Math.round((fullPass / total) * 100) : 0;
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-pass').textContent = fullPass;
+            document.getElementById('kpi-fail1').textContent = oneFail;
+            document.getElementById('kpi-rate').textContent = `${rate}%`;
+            document.getElementById('kpi-pass-label').textContent = 'Full Pass';
+            document.getElementById('kpi-fail-label').textContent = '1 Subject Fail';
+        }
+
+        // ── Filtering ───────────────────────────────────────────
+        function applyCurrentFilters() {
+            if (!activeSheetName || !workbookData[activeSheetName]) return;
+            const students = workbookData[activeSheetName];
+            const searchVal = document.getElementById('student-search').value.toLowerCase().trim();
+            const filterVal = document.getElementById('student-filter').value;
+
+            const filtered = students.filter(s => {
+                const matchSearch = s.name.toLowerCase().includes(searchVal) || s.reg.includes(searchVal);
+                // "Full pass" respects totalSubjectCount: student must have all expected subjects
+                const isFullPass = s.fail_count === 0
+                    && s.subjects.every(sub => classifySubject(sub) !== 'ABSENT')
+                    && (!totalSubjectCount || s.subjects.length >= totalSubjectCount);
+                let matchFilter = false;
+                if (filterVal === 'ALL') matchFilter = true;
+                else if (filterVal === 'PASS') matchFilter = isFullPass;
+                else if (filterVal === 'FAIL1') matchFilter = s.fail_count === 1;
+                else if (filterVal === 'FAIL_MULTI') matchFilter = s.fail_count > 1;
+                return matchSearch && matchFilter;
+            });
+
+            document.getElementById('record-count').textContent = `Showing ${filtered.length} of ${students.length} students`;
+            renderStudentView(filtered);
+            renderSubjectStatsView(students);
+        }
+
+        // ── Student cards ───────────────────────────────────────
+        function renderStudentView(students) {
+            const grid = document.getElementById('student-grid');
+            grid.innerHTML = '';
+
+            if (!students.length) {
+                grid.innerHTML = `<div class="col-span-2 text-center py-10 bg-white border rounded-xl text-slate-400 text-sm">No matched student profile indexes found.</div>`;
+                return;
+            }
+
+            students.forEach(student => {
+                const card = document.createElement('div');
+                card.className = "bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden";
+
+                // Show all class subjects; students missing one get a N/A row
+                const subMap = {};
+                student.subjects.forEach(sub => { subMap[sub.name] = sub; });
+                const missingCount = totalSubjectCount
+                    ? Math.max(0, totalSubjectCount - student.subjects.length)
+                    : 0;
+
+                // Header badge
+                const isFullPass = student.fail_count === 0
+                    && student.subjects.every(sub => classifySubject(sub) !== 'ABSENT')
+                    && (!totalSubjectCount || student.subjects.length >= totalSubjectCount);
+                const badgeText = isFullPass ? student.status
+                    : missingCount > 0 ? `${student.status} · ${missingCount} Missing`
+                        : student.status;
+                const badgeColor = isFullPass ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : student.fail_count === 1 && !missingCount ? "bg-amber-50 text-amber-700 border-amber-200"
+                        : "bg-rose-50 text-rose-700 border-rose-200";
+
+                // Table rows — iterate full class list, not just student's own subjects
+                let tableRows = "";
+                sheetSubjectNames.forEach(subName => {
+                    const sub = subMap[subName];
+                    const cls = sub ? classifySubject(sub) : 'ABSENT';
+                    const isMissing = !sub;
+                    const isAbsent = cls === 'ABSENT';
+                    const isFail = cls === 'FAIL';
+                    const rowBg = isFail ? 'bg-rose-50/50' : (isAbsent || isMissing) ? 'bg-slate-50' : '';
+                    const badge = isMissing
+                        ? `<span class="bg-slate-100 text-slate-400 text-xs px-2 py-0.5 rounded font-medium italic">Not Available</span>`
+                        : isAbsent
+                            ? `<span class="bg-slate-100 text-slate-500 text-xs px-2 py-0.5 rounded font-medium">Absent</span>`
+                            : isFail
+                                ? `<span class="bg-rose-100 text-rose-800 text-xs px-2 py-0.5 rounded font-medium">Failed</span>`
+                                : `<span class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded font-medium">Passed</span>`;
+
+                    tableRows += `
+                        <tr class="${rowBg} hover:bg-slate-50">
+                            <td class="px-3 sm:px-6 py-2 sm:py-2.5 font-medium ${isMissing ? 'text-slate-400 italic' : 'text-slate-800'}">${subName}</td>
+                            <td class="px-3 sm:px-6 py-2 sm:py-2.5 text-center font-mono text-slate-400">${(isMissing || isAbsent) ? '—' : sub.marks}</td>
+                            <td class="px-3 sm:px-6 py-2 sm:py-2.5 text-center font-semibold ${isFail ? 'text-rose-600' : 'text-slate-400'}">${(isMissing || isAbsent) ? '—' : sub.grade}</td>
+                            <td class="px-3 sm:px-6 py-2 sm:py-2.5 text-center">${badge}</td>
+                        </tr>`;
+                });
+
+                if (!sheetSubjectNames.length) {
+                    tableRows = `<tr><td colspan="4" class="px-6 py-4 text-center text-slate-400 text-xs italic">No subject data available</td></tr>`;
+                }
+
+                card.innerHTML = `
+                    <div class="px-4 sm:px-6 py-3 sm:py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                                <h4 class="text-sm sm:text-base font-bold text-slate-900">${student.name}</h4>
+                                <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full border ${badgeColor}">${badgeText}</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-0.5">Reg: <span class="font-mono font-medium text-slate-700">${student.reg}</span> | <span class="hidden sm:inline">Stream: </span>${student.dept}</p>
+                        </div>
+                        <button onclick="exportStudentPDF('${student.reg}')"
+                            class="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-red-600 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h4a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+                            Export
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-600">
+                            <thead class="bg-slate-100/60 uppercase font-semibold text-slate-500 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-3 sm:px-6 py-2">Subject / Module</th>
+                                    <th class="px-3 sm:px-6 py-2 text-center w-16 sm:w-24">Marks</th>
+                                    <th class="px-3 sm:px-6 py-2 text-center w-16 sm:w-24">Grade</th>
+                                    <th class="px-3 sm:px-6 py-2 text-center w-16 sm:w-24">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">${tableRows}</tbody>
+                        </table>
+                    </div>`;
+                grid.appendChild(card);
+            });
+        }
+
+        // ── Subject stats table ─────────────────────────────────
+        function renderSubjectStatsView(students) {
+            const tbody = document.getElementById('subject-table-body');
+            tbody.innerHTML = '';
+            const subjectMap = {};
+            students.forEach(s => s.subjects.forEach(sub => {
+                if (!subjectMap[sub.name]) subjectMap[sub.name] = { total: 0, pass: 0, fail: 0, absent: 0 };
+                subjectMap[sub.name].total++;
+                const cls = classifySubject(sub);
+                if (cls === 'PASS') subjectMap[sub.name].pass++;
+                else if (cls === 'FAIL') subjectMap[sub.name].fail++;
+                else subjectMap[sub.name].absent++;
+            }));
+
+            Object.keys(subjectMap).forEach(subName => {
+                const s = subjectMap[subName];
+                const rate = Math.round((s.pass / s.total) * 100);
+                const pc = rate < 50 ? "bg-rose-500" : rate < 75 ? "bg-amber-500" : "bg-emerald-500";
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors";
+                tr.innerHTML = `
+                    <td class="px-3 sm:px-6 py-2.5 sm:py-3.5 font-medium text-slate-800">${subName}</td>
+                    <td class="px-3 sm:px-6 py-2.5 sm:py-3.5 text-center font-semibold text-slate-900">${s.total}</td>
+                    <td class="px-3 sm:px-6 py-2.5 sm:py-3.5 text-center text-emerald-600 font-medium">${s.pass}</td>
+                    <td class="px-3 sm:px-6 py-2.5 sm:py-3.5 text-center text-rose-600 font-medium">${s.fail}</td>
+                    <td class="px-3 sm:px-6 py-2.5 sm:py-3.5">
+                        <div class="flex items-center gap-2 sm:gap-3 justify-end sm:justify-start">
+                            <span class="font-mono font-bold w-10 text-right">${rate}%</span>
+                            <div class="w-16 sm:w-24 bg-slate-200 h-2 rounded-full overflow-hidden hidden sm:block">
+                                <div class="${pc} h-full" style="width:${rate}%"></div>
+                            </div>
+                        </div>
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ── View tab switching ──────────────────────────────────
+        function switchViewTab(tabId) {
+            currentActiveView = tabId;
+            document.getElementById('view-tabs-select').value = tabId;
+            Array.from(document.getElementsByClassName('view-tab')).forEach(btn => {
+                btn.className = "view-tab border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 border-b-2 py-4 px-1 text-sm font-medium tracking-wide cursor-pointer focus:outline-none";
+            });
+            document.getElementById(`tab-${tabId}`).className = "view-tab border-blue-500 text-blue-600 border-b-2 py-4 px-1 text-sm font-medium tracking-wide cursor-pointer focus:outline-none";
+            Array.from(document.getElementsByClassName('view-content')).forEach(d => d.classList.add('hidden'));
+            document.getElementById(`content-${tabId}`).classList.remove('hidden');
+        }
+
+        // ── Classify a subject result ───────────────────────────
+        function classifySubject(sub) {
+            const m = sub.marks.toUpperCase();
+            const g = sub.grade.toUpperCase();
+            const r = sub.result.toUpperCase();
+            if (ABSENT_MARKERS.has(m) || ABSENT_MARKERS.has(g) || ABSENT_MARKERS.has(r)) return 'ABSENT';
+            if (r === 'F' || g === 'F') return 'FAIL';
+            return 'PASS';
+        }
+
+        // ── Export dropdown ─────────────────────────────────────
+        function toggleExportMenu(e) {
+            e.stopPropagation();
+            document.getElementById('export-menu').classList.toggle('hidden');
+        }
+
+        function rebuildExportMenu() {
+            document.getElementById('export-menu').innerHTML = `
+                <p class="text-xs font-bold uppercase text-slate-400 px-3 pt-2 pb-1">Export PDF</p>
+                <button onclick="exportToPDF('ALL')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-slate-400 inline-block"></span> All Students
+                </button>
+                <button onclick="exportToPDF('PASS')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span> Full Pass Only
+                </button>
+                <button onclick="exportToPDF('FAIL1')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-500 inline-block"></span> 1 Subject Fail
+                </button>
+                <button onclick="exportToPDF('FAIL_MULTI')" class="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2 border-t border-slate-100">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Multiple Fails
+                </button>`;
+        }
+
+        // ── PDF Export ──────────────────────────────────────────
+        function exportToPDF(filterType) {
+            document.getElementById('export-menu').classList.add('hidden');
+            if (!activeSheetName || !workbookData[activeSheetName]) { alert('Please select a sheet first.'); return; }
+            const allStudents = workbookData[activeSheetName];
+
+            // Filter using same logic as UI
+            let students = allStudents;
+            if (filterType === 'PASS') {
+                students = allStudents.filter(s =>
+                    s.fail_count === 0
+                    && s.subjects.every(sub => classifySubject(sub) !== 'ABSENT')
+                    && (!totalSubjectCount || s.subjects.length >= totalSubjectCount));
+            } else if (filterType === 'FAIL1') {
+                students = allStudents.filter(s => s.fail_count === 1);
+            } else if (filterType === 'FAIL_MULTI') {
+                students = allStudents.filter(s => s.fail_count > 1);
+            }
+            if (!students.length) { alert('No students match the selected filter.'); return; }
+
+            // Always use the full class subject list (same columns for every student)
+            const subjectOrder = sheetSubjectNames;
+
+            const totalLine = totalSubjectCount
+                ? `Total Subjects: ${totalSubjectCount}   |   `
+                : '';
+            const labels = { ALL: 'All Students', PASS: 'Full Pass', FAIL1: '1 Subject Fail', FAIL_MULTI: 'Multiple Fails' };
+
+            const head = [['S.No', 'Reg No', 'Student Name', ...subjectOrder]];
+            const body = students.map((s, i) => {
+                const subMap = {};
+                s.subjects.forEach(sub => { subMap[sub.name] = sub; });
+                const cells = subjectOrder.map(n => {
+                    if (!subMap[n]) return 'N/A';
+                    const cls = classifySubject(subMap[n]);
+                    if (cls === 'ABSENT') return 'Absent';
+                    return cls === 'FAIL' ? 'F' : 'P';
+                });
+                return [i + 1, s.reg, s.name, ...cells];
+            });
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+            doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+            doc.text(`Result Report — ${activeSheetName}`, 14, 14);
+            doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+            doc.text(`${totalLine}Filter: ${labels[filterType]}   |   Students: ${students.length}   |   Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 20);
+            doc.setTextColor(0);
+
+            doc.autoTable({
+                head, body, startY: 25,
+                styles: { fontSize: 6.5, cellPadding: 2, valign: 'middle', halign: 'center', lineColor: [226, 232, 240], lineWidth: 0.2 },
+                headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+                columnStyles: {
+                    0: { cellWidth: 10 },
+                    1: { cellWidth: 22 },
+                    2: { cellWidth: 38, halign: 'left' },
+                },
+                didParseCell(data) {
+                    if (data.section !== 'body') return;
+                    const val = String(data.cell.raw || '');
+                    if (data.column.index < 3) return;
+                    if (val === 'F') { data.cell.styles.fillColor = [255, 241, 242]; data.cell.styles.textColor = [185, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
+                    else if (val === 'Absent') { data.cell.styles.fillColor = [248, 250, 252]; data.cell.styles.textColor = [148, 163, 184]; data.cell.styles.fontStyle = 'italic'; }
+                    else if (val === 'N/A') { data.cell.styles.fillColor = [248, 250, 252]; data.cell.styles.textColor = [203, 213, 225]; }
+                    else if (val === 'P') { data.cell.styles.fillColor = [240, 253, 244]; data.cell.styles.textColor = [21, 128, 61]; }
+                },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                margin: { left: 10, right: 10 },
+            });
+
+            doc.save(`Result_${activeSheetName.replace(/[^a-z0-9]/gi, '_')}_${filterType}.pdf`);
+        }
+
+        // ── Individual student PDF export ───────────────────────
+        function exportStudentPDF(regNo) {
+            const student = workbookData[activeSheetName]?.find(s => s.reg === regNo);
+            if (!student) return;
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+            // Header block
+            doc.setFillColor(15, 23, 42);
+            doc.rect(0, 0, 210, 38, 'F');
+
+            doc.setFontSize(15); doc.setFont('helvetica', 'bold'); doc.setTextColor(255);
+            doc.text(student.name, 14, 14);
+
+            doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(148, 163, 184);
+            doc.text(`Register No: ${student.reg}   |   Stream: ${student.dept}   |   Class: ${activeSheetName}`, 14, 22);
+            doc.text(`Generated: ${new Date().toLocaleDateString('en-IN')}`, 14, 29);
+
+            // Status badge area
+            const isFullPass = student.fail_count === 0 && student.subjects.every(s => classifySubject(s) !== 'ABSENT')
+                && (!totalSubjectCount || student.subjects.length >= totalSubjectCount);
+            const statusText = isFullPass ? 'FULL PASS' : student.status.toUpperCase();
+            const statusColor = isFullPass ? [21, 128, 61] : student.fail_count === 1 ? [180, 83, 9] : [185, 28, 28];
+            doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(...statusColor);
+            doc.text(statusText, 196, 22, { align: 'right' });
+            doc.setTextColor(0);
+
+            // Subject table — all class subjects, N/A for missing
+            const head = [['#', 'Subject', 'Marks', 'Grade', 'Result']];
+            const subMap = {};
+            student.subjects.forEach(s => { subMap[s.name] = s; });
+
+            const body = sheetSubjectNames.map((name, i) => {
+                const sub = subMap[name];
+                if (!sub) return [i + 1, name, '—', '—', 'N/A'];
+                const cls = classifySubject(sub);
+                if (cls === 'ABSENT') return [i + 1, name, '—', '—', 'Absent'];
+                return [i + 1, name, sub.marks, sub.grade, cls === 'FAIL' ? 'Failed' : 'Passed'];
+            });
+
+            doc.autoTable({
+                head, body, startY: 44,
+                styles: { fontSize: 9, cellPadding: 3, valign: 'middle', lineColor: [226, 232, 240], lineWidth: 0.2 },
+                headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                columnStyles: {
+                    0: { cellWidth: 12, halign: 'center' },
+                    1: { cellWidth: 100, halign: 'left' },
+                    2: { cellWidth: 22, halign: 'center' },
+                    3: { cellWidth: 22, halign: 'center' },
+                    4: { cellWidth: 28, halign: 'center' },
+                },
+                didParseCell(data) {
+                    if (data.section !== 'body' || data.column.index !== 4) return;
+                    const val = String(data.cell.raw || '');
+                    if (val === 'Passed') { data.cell.styles.fillColor = [240, 253, 244]; data.cell.styles.textColor = [21, 128, 61]; data.cell.styles.fontStyle = 'bold'; }
+                    else if (val === 'Failed') { data.cell.styles.fillColor = [255, 241, 242]; data.cell.styles.textColor = [185, 28, 28]; data.cell.styles.fontStyle = 'bold'; }
+                    else { data.cell.styles.fillColor = [248, 250, 252]; data.cell.styles.textColor = [148, 163, 184]; data.cell.styles.fontStyle = 'italic'; }
+                },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                margin: { left: 14, right: 14 },
+            });
+
+            // Summary footer line
+            const finalY = doc.lastAutoTable.finalY + 6;
+            doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100);
+            doc.text(`Total Subjects: ${sheetSubjectNames.length}   |   Failed: ${student.fail_count}   |   Overall: ${statusText}`, 14, finalY);
+
+            doc.save(`${student.reg}_${student.name.replace(/\s+/g, '_')}.pdf`);
+        }
+    </script>
+</body>
+
+</html>
