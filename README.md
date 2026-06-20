@@ -2,6 +2,45 @@
 
 A browser-based teacher analytics and result portal for analyzing student exam results from Excel workbooks.
 
+> **Live Demo:** `https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/result.html`
+> *(Replace with your actual GitHub username and repo name after deployment)*
+
+---
+
+## Deploy & Share (GitHub Pages)
+
+Anyone can use the tool directly in their browser — no install needed — once you publish it via GitHub Pages.
+
+### One-time setup
+
+```bash
+# 1. Open terminal in your project folder
+git init
+git add .
+git commit -m "Initial commit"
+
+# 2. Push to GitHub (use the URL from your new GitHub repo)
+git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO_NAME.git
+git branch -M main
+git push -u origin main
+```
+
+Then on GitHub:
+
+1. Go to your repository → **Settings**
+2. Scroll to **Pages** (left sidebar)
+3. Under **Source**, select **Deploy from a branch** → `main` → `/ (root)`
+4. Click **Save**
+
+Your live URL will be:
+```
+https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/result.html
+```
+
+GitHub Pages takes ~1–2 minutes to go live. Share that link with anyone — they just open it in a browser and upload their Excel file.
+
+---
+
 ## Features
 
 - **Multi-sheet support** — load an `.xlsx` / `.xls` workbook and switch between class sheets via tabs
@@ -14,7 +53,7 @@ A browser-based teacher analytics and result portal for analyzing student exam r
 
 ## Usage
 
-1. Open `result.html` in any modern browser (Chrome, Edge, Firefox).
+1. Open the live link (or `result.html` locally) in any modern browser (Chrome, Edge, Firefox).
 2. Click **Upload Excel** and select your `.xlsx` or `.xls` result file.
 3. Click a sheet tab to load that class.
 4. *(Optional)* Enter the **Total Subjects** count to validate completeness.
